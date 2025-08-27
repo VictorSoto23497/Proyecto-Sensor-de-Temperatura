@@ -1,0 +1,185 @@
+//-----------------------------------------------------
+//Universidad del Valle de Guatemala
+//BE3029- Electrónica Digital 2
+//Victor Soto 23497
+//sot23497@uvg.edu.gt
+//19/08/2025
+//Nombre:Borrador Proyecto
+//Mcu:ESP32 dev kit
+//Entradas:Boton
+//Salidas:Servo,LEDS,Display
+//-----------------------------------------------------
+
+
+//-----------------------------------------------------
+//Librerias
+#include <Arduino.h>
+#include <stdint.h>
+#include "driver/ledc.h"
+//-----------------------------------------------------
+
+//-----------------------------------------------------
+//Definiciones de pines(LEDS,ServoMotor,Display,Boton,Sensor de temperatura)
+const int LEDPins[3]={14,27,26};//Llenar Pines 3 necesarios
+//Boton temperatura
+#define BTNT 12
+//Pin del servo motor
+#define pinServo 13
+//Pin del sensor
+#define sensorT 34
+//-----------------------------------------------------
+//Display 7 segmentos
+#define LE 15
+#define LD 2
+#define LDP 0
+#define LC 4
+#define LG 16
+#define LB 18
+#define LF 17
+#define LA 5
+
+#define Display1 21
+#define Display2 22
+#define Display3 23
+//-----------------------------------------------------
+
+//-----------------------------------------------------
+//Canales PWM (0-16) de LEDS y Servomotor
+const int canalPWML1=7;
+const int canalPWML2=1;
+const int canalPWML3=2;
+const int canalServo=4;
+//-----------------------------------------------------
+
+//-----------------------------------------------------
+//Parámetros para las señales PWM
+const int frecuencia=50; // 50 Hz (20 ms)
+//Resolución solo de las LEDS
+const int resolucionL=6; // bits (0-64)
+//Resolución solo del Servo Motor
+const int resolucionM=16;
+//-----------------------------------------------------
+
+//-----------------------------------------------------
+//Variables del Boton(Interrupción)
+volatile bool btntpressed;
+volatile uint32_t lastISRbtnt=0;
+//-----------------------------------------------------
+
+
+//-----------------------------------------------------
+//Prototipos de funciones
+void initBotont(void);
+void IRAM_ATTR BTNT_ISR(void);
+//-----------------------------------------------------
+
+//-----------------------------------------------------
+//Rutinas de interrupción
+void IRAM_ATTR BTNT_ISR(void){
+  uint32_t tiempoActual = millis();
+  if (tiempoActual - lastISRbtnt > 250) {
+    btntpressed = true;
+    lastISRbtnt = tiempoActual;
+  }
+}
+//-----------------------------------------------------
+
+
+double adcRaw = 0; // Y(0)
+double alpha = 0.05; // Factor de suavizado (0-1)
+double adcFiltrado = adcRaw; // S(0) = Y(0)
+void setup() {
+  Serial.begin(115200);
+  initBotont();
+  pinMode(sensorT,INPUT);
+  pinMode(LEDPins[0],OUTPUT);
+  pinMode(LEDPins[1],OUTPUT);
+  pinMode(LEDPins[2],OUTPUT);
+  for (int i=0; i<3;i++){
+    digitalWrite(LEDPins[i],LOW);
+  }
+  ledcSetup(canalPWML1,frecuencia,resolucionL);//Canal,frecuencia,resolucion
+  ledcAttachPin(LEDPins[0],canalPWML1);//Pin y Canal
+
+  ledcSetup(canalPWML2,frecuencia,resolucionL);//Canal,frecuencia,resolucion
+  ledcAttachPin(LEDPins[1],canalPWML2);//Pin y Canal
+
+  ledcSetup(canalPWML3,frecuencia,resolucionL);//Canal,frecuencia,resolucion
+  ledcAttachPin(LEDPins[2],canalPWML3);
+
+  ledcSetup(canalServo,frecuencia,16);//Canal,frecuencia,resolucion
+  ledcAttachPin(pinServo,canalServo);
+
+  pinMode(LE,OUTPUT);
+  pinMode(LD,OUTPUT);
+  pinMode(LDP,OUTPUT);
+  pinMode(LC,OUTPUT);
+  pinMode(LG,OUTPUT);
+  pinMode(LB,OUTPUT);
+  pinMode(LF,OUTPUT);
+  pinMode(LA,OUTPUT);
+
+  pinMode(Display1,OUTPUT);
+  pinMode(Display2,OUTPUT);
+  pinMode(Display3,OUTPUT);
+
+
+  digitalWrite(LE,LOW);
+  digitalWrite(LD,LOW);
+  digitalWrite(LDP,LOW);
+  digitalWrite(LC,LOW);
+  digitalWrite(LG,LOW);
+  digitalWrite(LB,LOW);
+  digitalWrite(LF,LOW);
+  digitalWrite(LA,LOW);
+
+  digitalWrite(Display1,LOW);
+  digitalWrite(Display2,LOW);
+  digitalWrite(Display3,LOW);
+}
+
+void loop() {
+  ledcWrite(canalPWML1,63);
+  ledcWrite(canalPWML2,63);
+  ledcWrite(canalPWML3,63);
+
+  digitalWrite(LE,HIGH);
+  digitalWrite(LD,HIGH);
+  digitalWrite(LDP,HIGH);
+  digitalWrite(LC,HIGH);
+  digitalWrite(LG,HIGH);
+  digitalWrite(LB,HIGH);
+  digitalWrite(LF,HIGH);
+  digitalWrite(LA,HIGH);
+
+  digitalWrite(Display1,HIGH);
+  digitalWrite(Display2,HIGH);
+  digitalWrite(Display3,HIGH);
+
+  btntpressed = false;
+  adcRaw = analogRead(sensorT);
+  adcFiltrado = (alpha * adcRaw) + ((1.0 - alpha) * adcFiltrado);
+
+  float valorMapeado = map((int)adcFiltrado, 100, 280, 15, 35);
+  Serial.print("ADC filtrado: ");
+
+    Serial.print(adcFiltrado);
+
+
+    Serial.print("  Mapeado: ");
+    Serial.println(valorMapeado);
+  if (btntpressed){
+    // Imprimir
+    Serial.print("ADC filtrado: ");
+    Serial.print(adcFiltrado);
+
+
+    Serial.print("  Mapeado: ");
+    Serial.println(valorMapeado);
+  }
+}
+
+void initBotont(void){
+  pinMode(BTNT,INPUT);
+  attachInterrupt(BTNT,&BTNT_ISR,FALLING);
+}
