@@ -139,10 +139,6 @@ void setup() {
 }
 
 void loop() {
-  ledcWrite(canalPWML1,63);
-  ledcWrite(canalPWML2,63);
-  ledcWrite(canalPWML3,63);
-
   digitalWrite(LE,HIGH);
   digitalWrite(LD,HIGH);
   digitalWrite(LDP,HIGH);
@@ -159,15 +155,8 @@ void loop() {
   btntpressed = false;
   adcRaw = analogRead(sensorT);
   adcFiltrado = (alpha * adcRaw) + ((1.0 - alpha) * adcFiltrado);
-
-  float valorMapeado = map((int)adcFiltrado, 100, 280, 15, 35);
-  Serial.print("ADC filtrado: ");
-
-    Serial.print(adcFiltrado);
-
-
-    Serial.print("  Mapeado: ");
-    Serial.println(valorMapeado);
+  float voltaje = (adcFiltrado / 4095.0) * 5;
+  float temperatura = voltaje / 0.01;
   if (btntpressed){
     // Imprimir
     Serial.print("ADC filtrado: ");
@@ -182,4 +171,22 @@ void loop() {
 void initBotont(void){
   pinMode(BTNT,INPUT);
   attachInterrupt(BTNT,&BTNT_ISR,FALLING);
+}
+void senalesPWM(float temp){
+  if(temp< 22.0){
+    ledcWrite(canalPWML1,63);
+    ledcWrite(canalPWML2,0);
+    ledcWrite(canalPWML3,0);
+  }
+  else if (temp>22.0 && temp<25.0)
+  {
+    ledcWrite(canalPWML1,0);
+    ledcWrite(canalPWML2,63);
+    ledcWrite(canalPWML3,0);
+  }
+  else{
+    ledcWrite(canalPWML1,0);
+    ledcWrite(canalPWML2,0);
+    ledcWrite(canalPWML3,63);
+  }
 }
