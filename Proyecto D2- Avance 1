@@ -71,16 +71,51 @@ volatile uint32_t lastISRbtnt=0;
 //Prototipos de funciones
 void initBotont(void);
 void IRAM_ATTR BTNT_ISR(void);
+void senalesPWM(float temp);
+void LEDSDISPLAY(int num);
+void TemperaturaDisplay(float temp);
+volatile int decena;
+volatile int unidad;
+volatile int decimal;
 //-----------------------------------------------------
 
 //-----------------------------------------------------
-//Rutinas de interrupción
+//Rutinas de interrupción y timers
 void IRAM_ATTR BTNT_ISR(void){
   uint32_t tiempoActual = millis();
   if (tiempoActual - lastISRbtnt > 250) {
     btntpressed = true;
     lastISRbtnt = tiempoActual;
   }
+}
+
+void initTMR0(void);
+hw_timer_t *MiRelojito = NULL; 
+volatile int cont;
+void IRAM_ATTR TMR0_ISR(void){
+  digitalWrite(Display1, LOW);
+  digitalWrite(Display2, LOW);
+  digitalWrite(Display3, LOW);
+
+  switch(cont){
+    case 0: // decena
+      LEDSDISPLAY(decena);
+      digitalWrite(Display1, HIGH);
+      digitalWrite(LDP,LOW);
+      break;
+    case 1: // unidad
+      LEDSDISPLAY(unidad);
+      digitalWrite(LDP,HIGH);
+      digitalWrite(Display2, HIGH);
+      break;
+    case 2: // decimal
+      LEDSDISPLAY(decimal);
+      digitalWrite(Display3, HIGH);
+      digitalWrite(LDP,LOW);
+      break;
+  }
+  cont++;
+  if(cont > 2) cont = 0;
 }
 //-----------------------------------------------------
 
@@ -136,27 +171,18 @@ void setup() {
   digitalWrite(Display1,LOW);
   digitalWrite(Display2,LOW);
   digitalWrite(Display3,LOW);
+
+  initTMR0();
 }
 
 void loop() {
-  digitalWrite(LE,HIGH);
-  digitalWrite(LD,HIGH);
-  digitalWrite(LDP,HIGH);
-  digitalWrite(LC,HIGH);
-  digitalWrite(LG,HIGH);
-  digitalWrite(LB,HIGH);
-  digitalWrite(LF,HIGH);
-  digitalWrite(LA,HIGH);
-
-  digitalWrite(Display1,HIGH);
-  digitalWrite(Display2,HIGH);
-  digitalWrite(Display3,HIGH);
-
-  btntpressed = false;
   adcRaw = analogRead(sensorT);
   adcFiltrado = (alpha * adcRaw) + ((1.0 - alpha) * adcFiltrado);
   float voltaje = (adcFiltrado / 4095.0) * 5;
+
+  // Convertir voltaje a temperatura (LM35: 10mV/°C = 0.01 V/°C)
   float temperatura = voltaje / 0.01;
+
   if (btntpressed){
     // Imprimir
     Serial.print("ADC filtrado: ");
@@ -164,12 +190,17 @@ void loop() {
 
 
     Serial.print("  Mapeado: ");
-    Serial.println(valorMapeado);
+    Serial.println(temperatura);
+    senalesPWM(temperatura);
+    TemperaturaDisplay(temperatura);
+    Serial.println(decena);
+    Serial.print(unidad);
+    Serial.print(decimal);
+    btntpressed = false; 
   }
 }
-
 void initBotont(void){
-  pinMode(BTNT,INPUT);
+  pinMode(BTNT,INPUT_PULLUP);
   attachInterrupt(BTNT,&BTNT_ISR,FALLING);
 }
 void senalesPWM(float temp){
@@ -177,16 +208,131 @@ void senalesPWM(float temp){
     ledcWrite(canalPWML1,63);
     ledcWrite(canalPWML2,0);
     ledcWrite(canalPWML3,0);
+    ledcWrite(canalServo,2457);//Al colocar en la maqueta puede cambiar por el caso 3
   }
   else if (temp>22.0 && temp<25.0)
   {
     ledcWrite(canalPWML1,0);
     ledcWrite(canalPWML2,63);
     ledcWrite(canalPWML3,0);
+    ledcWrite(canalServo,4915);
   }
   else{
     ledcWrite(canalPWML1,0);
     ledcWrite(canalPWML2,0);
     ledcWrite(canalPWML3,63);
+    ledcWrite(canalServo,7372);//Al colocar en la maqueta puede cambiar por el caso 1
   }
 }
+
+void LEDSDISPLAY(int num){
+  switch(num){
+    case 0: 
+      digitalWrite(LA,HIGH); 
+      digitalWrite(LB,HIGH); 
+      digitalWrite(LC,HIGH); 
+      digitalWrite(LD,HIGH); 
+      digitalWrite(LE,HIGH); 
+      digitalWrite(LF,HIGH); 
+      digitalWrite(LG,LOW); 
+    break;
+    case 1:
+      digitalWrite(LA,LOW);
+      digitalWrite(LB,HIGH);
+      digitalWrite(LC,HIGH);
+      digitalWrite(LD,LOW); 
+      digitalWrite(LE,LOW); 
+      digitalWrite(LF,LOW); 
+      digitalWrite(LG,LOW); 
+      break;
+    case 2: 
+      digitalWrite(LA,HIGH); 
+      digitalWrite(LB,HIGH); 
+      digitalWrite(LC,LOW);
+      digitalWrite(LG,HIGH); 
+      digitalWrite(LE,HIGH); 
+      digitalWrite(LD,HIGH); 
+      digitalWrite(LF,LOW); 
+    break;
+    case 3: 
+      digitalWrite(LA,HIGH); 
+      digitalWrite(LB,HIGH); 
+      digitalWrite(LC,HIGH); 
+      digitalWrite(LD,HIGH); 
+      digitalWrite(LE,LOW);
+      digitalWrite(LF,LOW);
+      digitalWrite(LG,HIGH); 
+      break;
+    case 4: 
+      digitalWrite(LA,LOW);
+      digitalWrite(LD,LOW);
+      digitalWrite(LE,LOW);
+      digitalWrite(LF,HIGH); 
+      digitalWrite(LB,HIGH); 
+      digitalWrite(LC,HIGH); 
+      digitalWrite(LG,HIGH); 
+      break;
+    case 5: 
+      digitalWrite(LA,HIGH); 
+      digitalWrite(LB,LOW);
+      digitalWrite(LE,LOW);
+      digitalWrite(LF,HIGH); 
+      digitalWrite(LG,HIGH); 
+      digitalWrite(LC,HIGH); 
+      digitalWrite(LD,HIGH); 
+      break;
+    case 6: 
+      digitalWrite(LA,HIGH); 
+      digitalWrite(LB,LOW);
+      digitalWrite(LF,HIGH); 
+      digitalWrite(LG,HIGH); 
+      digitalWrite(LC,HIGH); 
+      digitalWrite(LD,HIGH); 
+      digitalWrite(LE,HIGH); 
+      break;
+    case 7: 
+      digitalWrite(LA,HIGH); 
+      digitalWrite(LB,HIGH); 
+      digitalWrite(LC,HIGH); 
+      digitalWrite(LD,LOW);
+      digitalWrite(LE,LOW);
+      digitalWrite(LF,LOW);
+      digitalWrite(LG,LOW);
+      break;
+    case 8: 
+      digitalWrite(LA,HIGH); 
+      digitalWrite(LB,HIGH); 
+      digitalWrite(LC,HIGH); 
+      digitalWrite(LD,HIGH); 
+      digitalWrite(LE,HIGH); 
+      digitalWrite(LF,HIGH); 
+      digitalWrite(LG,HIGH); 
+      break;
+    case 9: 
+      digitalWrite(LA,HIGH); 
+      digitalWrite(LB,HIGH); 
+      digitalWrite(LC,HIGH); 
+      digitalWrite(LD,LOW); 
+      digitalWrite(LE,LOW);
+      digitalWrite(LF,HIGH); 
+      digitalWrite(LG,HIGH); 
+      break;
+  }
+}
+void TemperaturaDisplay(float temp){
+  int num=(int)roundf(temp*10);
+  decena=num/100; 
+  unidad=(num/10)%10;
+  decimal=(num%10);
+}
+void initTMR0(void){
+
+  MiRelojito = timerBegin(0, 80 , true);
+
+  timerAttachInterrupt(MiRelojito, &TMR0_ISR, true);
+
+  timerAlarmWrite(MiRelojito,1000, true);
+
+  timerAlarmEnable(MiRelojito);
+}
+
