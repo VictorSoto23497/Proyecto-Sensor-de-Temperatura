@@ -16,6 +16,7 @@
 #include <Arduino.h>
 #include <stdint.h>
 #include "driver/ledc.h"
+#include "config.h"
 //-----------------------------------------------------
 
 //-----------------------------------------------------
@@ -123,8 +124,26 @@ void IRAM_ATTR TMR0_ISR(void){
 double adcRaw = 0; // Y(0)
 double alpha = 0.05; // Factor de suavizado (0-1)
 double adcFiltrado = adcRaw; // S(0) = Y(0)
+
+AdafruitIO_Feed *canaltemp = io.feed("Temperatura");
+AdafruitIO_Feed *canaled = io.feed("feedled");
+AdafruitIO_Feed *canalreloj = io.feed("feedreloj");
+AdafruitIO_Feed *canalhumor = io.feed("feedhumor");
 void setup() {
   Serial.begin(115200);
+
+  //Adafruit
+  while(! Serial);
+  Serial.print("Conectando a Adafruit IO");
+  io.connect();
+  while(io.status() < AIO_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println();
+  Serial.println(io.statusText());
+
+
   initBotont();
   pinMode(sensorT,INPUT);
   pinMode(LEDPins[0],OUTPUT);
@@ -184,6 +203,7 @@ void loop() {
   float temperatura = voltaje / 0.01;
 
   if (btntpressed){
+     io.run();
     // Imprimir
     Serial.print("ADC filtrado: ");
     Serial.print(adcFiltrado);
@@ -193,9 +213,26 @@ void loop() {
     Serial.println(temperatura);
     senalesPWM(temperatura);
     TemperaturaDisplay(temperatura);
-    Serial.println(decena);
-    Serial.print(unidad);
-    Serial.print(decimal);
+
+    Serial.print("Sending ->");
+    Serial.println(temperatura);
+    canaltemp->save(temperatura);
+
+    if (temperatura<22){
+      canaled->save((String)"#0cf017"); 
+      canalreloj->save((String)"snowflake-o");
+      canalhumor->save((String)"frown-o");
+    }
+    else if (temperatura>=22 && temperatura<25){
+      canaled->save((String)"#ebff0d");
+      canalreloj->save((String)"w:day-sunny"); 
+      canalhumor->save((String)"meh-o");
+    }
+    else if (temperatura>=25){
+      canaled->save((String)"#ed0510");
+      canalreloj->save((String)"fire"); 
+      canalhumor->save((String)"smile-o");
+    }
     btntpressed = false; 
   }
 }
@@ -335,4 +372,3 @@ void initTMR0(void){
 
   timerAlarmEnable(MiRelojito);
 }
-
